@@ -20,7 +20,7 @@
   #bombaBtn { background: linear-gradient(90deg,#7b0f0f,#ff5252); }
   #controlBtn { background: linear-gradient(90deg,#0b5a85,#0bb7ff); }
   #timer { font-size: 100px; margin: 20px 0; }
-  #status { font-size: 28px; color: #9aa6b2; margin-top: 10px; }
+  #status { font-size: 28px; color: #9aa6b2; margin-top: 10px; text-align: center; }
   #controlPanel button { background: rgba(255,255,255,0.15); }
   #win { color: #00ff90; font-size: 38px; }
   #lose { color: #ff4040; font-size: 38px; }
@@ -102,6 +102,7 @@
     }
   });
 
+  // Función de cuenta regresiva
   async function startCountdown() {
     if (ticking) clearInterval(ticking);
     ticking = setInterval(async () => {
@@ -124,6 +125,7 @@
     }, 1000);
   }
 
+  // Botón Bomba
   document.getElementById("bombaBtn").addEventListener("click", async () => {
     role = "bomba";
     document.getElementById("selector").classList.add("hidden");
@@ -131,36 +133,47 @@
 
     const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
     const data = await resp.json();
-    if (!data.running) {
+    if (!data.running && !data.result) {
       await set(timerRef, { time: 300, running: true, result: "" });
       startCountdown();
-    } else startCountdown();
+    } else if (data.running) startCountdown();
   });
 
-  document.getElementById("controlBtn").addEventListener(() => {
+  // Botón Control
+  document.getElementById("controlBtn").addEventListener("click", () => {
     role = "control";
     document.getElementById("selector").classList.add("hidden");
     document.getElementById("controlView").classList.remove("hidden");
   });
 
+  // Restar tiempo
   document.getElementById("minusBtn").addEventListener("click", async () => {
     const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
     const data = await resp.json();
     if (data.result) return;
     let newTime = data.time - 60;
-    if (newTime < 0) newTime = 0;
+    if (newTime <= 0) {
+      await set(timerRef, { time: 0, running: false, result: "lose" });
+      return;
+    }
     await update(timerRef, { time: newTime });
   });
 
+  // Sumar tiempo
   document.getElementById("plusBtn").addEventListener("click", async () => {
     const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
     const data = await resp.json();
     if (data.result) return;
     let newTime = data.time + 90;
-    if (newTime > 600) newTime = 600;
+    if (newTime >= 600) {
+      await set(timerRef, { time: 600, running: false, result: "win" });
+      clearInterval(ticking);
+      return;
+    }
     await update(timerRef, { time: newTime });
   });
 
+  // Reiniciar
   document.getElementById("resetBtn").addEventListener("click", async () => {
     await set(timerRef, { time: 300, running: true, result: "" });
     startCountdown();
@@ -170,4 +183,3 @@
 </script>
 </body>
 </html>
-
