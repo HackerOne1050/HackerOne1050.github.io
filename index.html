@@ -140,11 +140,13 @@
   });
 
   // Botón Control
-  document.getElementById("controlBtn").addEventListener("click", () => {
-    role = "control";
-    document.getElementById("selector").classList.add("hidden");
-    document.getElementById("controlView").classList.remove("hidden");
-  });
+ // Botón Control (CORREGIDO)
+document.getElementById("controlBtn").addEventListener("click", () => {
+  role = "control";
+  document.getElementById("selector").classList.add("hidden");
+  document.getElementById("controlView").classList.remove("hidden");
+});
+
 
   // Restar tiempo
   document.getElementById("minusBtn").addEventListener("click", async () => {
@@ -183,3 +185,4 @@
 </script>
 </body>
 </html>
+
