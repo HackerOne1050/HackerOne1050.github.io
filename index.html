@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bomba Control Global</title>
+<style>
+  body {
+    margin: 0; font-family: Arial, sans-serif; 
+    background-color: #0b0f14; color: #fff;
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; flex-direction: column;
+  }
+  .hidden { display: none; }
+  button {
+    margin: 8px; padding: 12px 18px; border: none; border-radius: 8px;
+    font-weight: bold; cursor: pointer; color: #fff;
+  }
+  #bombaBtn { background: linear-gradient(90deg,#7b0f0f,#ff5252); }
+  #controlBtn { background: linear-gradient(90deg,#0b5a85,#0bb7ff); }
+  #timer { font-size: 100px; margin: 20px 0; }
+  #status { font-size: 28px; color: #9aa6b2; margin-top: 10px; }
+  #controlPanel button { background: rgba(255,255,255,0.15); }
+  #win { color: #0f0; font-size: 40px; }
+  #lose { color: #f33; font-size: 40px; }
+</style>
+</head>
+<body>
+
+<div id="selector">
+  <h1>Selecciona tu rol</h1>
+  <button id="bombaBtn">Bomba</button>
+  <button id="controlBtn">Control</button>
+</div>
+
+<div id="bombaView" class="hidden">
+  <div id="timer">05:00</div>
+  <div id="status">Esperando...</div>
+</div>
+
+<div id="controlView" class="hidden">
+  <div id="timer">05:00</div>
+  <div id="status">Modo Control</div>
+  <div id="controlPanel">
+    <button id="minusBtn">-1:00</button>
+    <button id="plusBtn">+1:30</button>
+    <button id="resetBtn">Reiniciar</button>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCcgyGXqbykaTrJvQRwgqkYSrFAUL-ob-8",
+    authDomain: "bombacontrol-363e8.firebaseapp.com",
+    databaseURL: "https://bombacontrol-363e8-default-rtdb.firebaseio.com",
+    projectId: "bombacontrol-363e8",
+    storageBucket: "bombacontrol-363e8.firebasestorage.app",
+    messagingSenderId: "387694346907",
+    appId: "1:387694346907:web:4a8b90e3bf25c1cd277c3e",
+    measurementId: "G-CXLEEKDE3J"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const timerRef = ref(db, 'timer');
+
+  // Estado local
+  let role = null;
+  let running = false;
+  let interval = null;
+
+  // Helpers
+  function formatTime(sec) {
+    if (sec < 0) sec = 0;
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  // Inicializar base si está vacía
+  set(timerRef, { time: 300, running: false, result: "" });
+
+  // Suscripción global
+  onValue(timerRef, snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
+    const time = data.time;
+    const result = data.result;
+
+    document.querySelectorAll("#timer").forEach(t => t.textContent = formatTime(time));
+    if (role === "bomba") {
+      if (result === "win") {
+        document.getElementById("status").innerHTML = "<span id='win'>🏆 GANASTE</span>";
+      } else if (result === "lose") {
+        document.getElementById("status").innerHTML = "<span id='lose'>💥 PERDISTE</span>";
+      } else {
+        document.getElementById("status").textContent = "Tiempo restante...";
+      }
+    }
+  });
+
+  // Lógica del temporizador global
+  function startGlobalTimer() {
+    if (interval) clearInterval(interval);
+    interval = setInterval(async () => {
+      const snap = (await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js')).get(timerRef);
+    }, 1000);
+  }
+
+  // Escuchar cambios y actualizar en Firebase
+  let ticking = null;
+  function startCountdown() {
+    if (ticking) clearInterval(ticking);
+    ticking = setInterval(async () => {
+      const snap = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
+      const data = await snap.json();
+      if (!data) return;
+      let { time, result } = data;
+
+      if (result) return; // si ya ganó o perdió
+      time -= 1;
+
+      // Condiciones de victoria y derrota
+      if (time <= 0) {
+        await set(timerRef, { time: 0, running: false, result: "lose" });
+        clearInterval(ticking);
+        return;
+      }
+      if (time >= 600) {
+        await set(timerRef, { time: 600, running: false, result: "win" });
+        clearInterval(ticking);
+        return;
+      }
+
+      await update(timerRef, { time });
+    }, 1000);
+  }
+
+  // Botones
+  document.getElementById("bombaBtn").addEventListener("click", async () => {
+    role = "bomba";
+    document.getElementById("selector").classList.add("hidden");
+    document.getElementById("bombaView").classList.remove("hidden");
+    // Inicia temporizador automáticamente solo si no está corriendo
+    const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
+    const data = await resp.json();
+    if (!data.running) {
+      await set(timerRef, { time: 300, running: true, result: "" });
+      startCountdown();
+    } else {
+      startCountdown();
+    }
+  });
+
+  document.getElementById("controlBtn").addEventListener("click", async () => {
+    role = "control";
+    document.getElementById("selector").classList.add("hidden");
+    document.getElementById("controlView").classList.remove("hidden");
+  });
+
+  document.getElementById("minusBtn").addEventListener("click", async () => {
+    const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
+    const data = await resp.json();
+    if (data.result) return;
+    let newTime = data.time - 60;
+    if (newTime < 0) newTime = 0;
+    await update(timerRef, { time: newTime });
+  });
+
+  document.getElementById("plusBtn").addEventListener("click", async () => {
+    const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
+    const data = await resp.json();
+    if (data.result) return;
+    let newTime = data.time + 90;
+    if (newTime > 600) newTime = 600;
+    await update(timerRef, { time: newTime });
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", async () => {
+    await set(timerRef, { time: 300, running: true, result: "" });
+    startCountdown();
+  });
+
+  // Iniciar cuenta atrás si ya está activa
+  startCountdown();
+
+</script>
+</body>
+</html>
