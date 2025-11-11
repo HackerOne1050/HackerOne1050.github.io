@@ -10,6 +10,7 @@
     background-color: #0b0f14; color: #fff;
     display: flex; justify-content: center; align-items: center;
     height: 100vh; flex-direction: column;
+    transition: background 0.8s;
   }
   .hidden { display: none; }
   button {
@@ -21,8 +22,8 @@
   #timer { font-size: 100px; margin: 20px 0; }
   #status { font-size: 28px; color: #9aa6b2; margin-top: 10px; }
   #controlPanel button { background: rgba(255,255,255,0.15); }
-  #win { color: #0f0; font-size: 40px; }
-  #lose { color: #f33; font-size: 40px; }
+  #win { color: #00ff90; font-size: 38px; }
+  #lose { color: #ff4040; font-size: 38px; }
 </style>
 </head>
 <body>
@@ -68,12 +69,9 @@
   const db = getDatabase(app);
   const timerRef = ref(db, 'timer');
 
-  // Estado local
   let role = null;
-  let running = false;
-  let interval = null;
+  let ticking = null;
 
-  // Helpers
   function formatTime(sec) {
     if (sec < 0) sec = 0;
     const m = Math.floor(sec / 60);
@@ -81,50 +79,37 @@
     return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   }
 
-  // Inicializar base si está vacía
+  // Inicializa Firebase si está vacío
   set(timerRef, { time: 300, running: false, result: "" });
 
-  // Suscripción global
+  // Escuchar cambios globales
   onValue(timerRef, snapshot => {
     const data = snapshot.val();
     if (!data) return;
-    const time = data.time;
-    const result = data.result;
-
+    const { time, result } = data;
     document.querySelectorAll("#timer").forEach(t => t.textContent = formatTime(time));
-    if (role === "bomba") {
-      if (result === "win") {
-        document.getElementById("status").innerHTML = "<span id='win'>🏆 GANASTE</span>";
-      } else if (result === "lose") {
-        document.getElementById("status").innerHTML = "<span id='lose'>💥 PERDISTE</span>";
-      } else {
-        document.getElementById("status").textContent = "Tiempo restante...";
-      }
+
+    if (result === "win") {
+      document.body.style.background = "#003b17";
+      document.getElementById("status").innerHTML = "<span id='win'>🏆 GANASTE, bomba desactivada</span>";
+    } else if (result === "lose") {
+      document.body.style.background = "#3b0000";
+      document.getElementById("status").innerHTML = "<span id='lose'>💥 PERDISTE, la bomba explotó</span>";
+    } else {
+      document.body.style.background = "#0b0f14";
+      if (role === "bomba") document.getElementById("status").textContent = "Tiempo restante...";
+      if (role === "control") document.getElementById("status").textContent = "Modo Control";
     }
   });
 
-  // Lógica del temporizador global
-  function startGlobalTimer() {
-    if (interval) clearInterval(interval);
-    interval = setInterval(async () => {
-      const snap = (await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js')).get(timerRef);
-    }, 1000);
-  }
-
-  // Escuchar cambios y actualizar en Firebase
-  let ticking = null;
-  function startCountdown() {
+  async function startCountdown() {
     if (ticking) clearInterval(ticking);
     ticking = setInterval(async () => {
-      const snap = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
-      const data = await snap.json();
-      if (!data) return;
-      let { time, result } = data;
+      const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
+      const data = await resp.json();
+      if (!data || data.result) return;
 
-      if (result) return; // si ya ganó o perdió
-      time -= 1;
-
-      // Condiciones de victoria y derrota
+      let time = data.time - 1;
       if (time <= 0) {
         await set(timerRef, { time: 0, running: false, result: "lose" });
         clearInterval(ticking);
@@ -135,28 +120,24 @@
         clearInterval(ticking);
         return;
       }
-
       await update(timerRef, { time });
     }, 1000);
   }
 
-  // Botones
   document.getElementById("bombaBtn").addEventListener("click", async () => {
     role = "bomba";
     document.getElementById("selector").classList.add("hidden");
     document.getElementById("bombaView").classList.remove("hidden");
-    // Inicia temporizador automáticamente solo si no está corriendo
+
     const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
     const data = await resp.json();
     if (!data.running) {
       await set(timerRef, { time: 300, running: true, result: "" });
       startCountdown();
-    } else {
-      startCountdown();
-    }
+    } else startCountdown();
   });
 
-  document.getElementById("controlBtn").addEventListener("click", async () => {
+  document.getElementById("controlBtn").addEventListener(() => {
     role = "control";
     document.getElementById("selector").classList.add("hidden");
     document.getElementById("controlView").classList.remove("hidden");
@@ -185,9 +166,8 @@
     startCountdown();
   });
 
-  // Iniciar cuenta atrás si ya está activa
   startCountdown();
-
 </script>
 </body>
 </html>
+
