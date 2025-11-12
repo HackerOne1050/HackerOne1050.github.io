@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bomba Control</title>
   <style>
@@ -43,11 +43,10 @@
   </style>
 </head>
 <body>
-
   <h1>💣 Juego: Bomba Control</h1>
   <p>Selecciona tu rol:</p>
-  <button onclick="setRole('bomba')">Bomba</button>
-  <button onclick="setRole('control')">Control</button>
+  <button id="btnBomba">Bomba</button>
+  <button id="btnControl">Control</button>
 
   <div id="game" style="display:none;">
     <h2 id="roleText"></h2>
@@ -62,13 +61,13 @@
     <h3 id="status"></h3>
   </div>
 
+  <!-- Sonidos -->
   <audio id="audioCargando" src="cargando.mp3" loop></audio>
   <audio id="audioProximo" src="proximo.mp3" loop></audio>
 
-  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-    import { getDatabase, ref, onValue, set, get, update } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
+    import { getDatabase, ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCcgyGXqbykaTrJvQRwgqkYSrFAUL-ob-8",
@@ -88,17 +87,16 @@
     let timerInterval;
     let time = 300; // 5 minutos
     let isRunning = false;
-    let audioCargando = document.getElementById("audioCargando");
-    let audioProximo = document.getElementById("audioProximo");
 
+    const audioCargando = document.getElementById("audioCargando");
+    const audioProximo = document.getElementById("audioProximo");
+
+    // --- Funciones principales ---
     function setRole(selectedRole) {
       role = selectedRole;
       document.getElementById("game").style.display = "block";
       document.getElementById("roleText").innerText = `Rol: ${role.toUpperCase()}`;
-
-      if (role === "control") {
-        document.getElementById("controls").style.display = "block";
-      }
+      if (role === "control") document.getElementById("controls").style.display = "block";
 
       const timerRef = ref(db, "timer");
       onValue(timerRef, (snapshot) => {
@@ -107,9 +105,15 @@
           time = data.time;
           isRunning = data.isRunning;
           updateDisplay();
+          handleAudio();
           checkWinLose();
         }
       });
+
+      // Si es bomba, iniciar el contador al entrar
+      if (role === "bomba") {
+        startTimer();
+      }
     }
 
     function updateDisplay() {
@@ -121,29 +125,34 @@
     function startTimer() {
       if (isRunning) return;
       isRunning = true;
-      update(ref(db, "timer"), { isRunning: true });
-
-      if (role === "bomba") playAudio();
+      update(ref(db, "timer"), { isRunning: true, time });
 
       timerInterval = setInterval(() => {
         if (!isRunning) return;
-
         time--;
+        if (time < 0) time = 0;
         update(ref(db, "timer"), { time, isRunning });
-
-        checkAudioChange();
         checkWinLose();
       }, 1000);
     }
 
-    function playAudio() {
-      stopAudio();
+    function handleAudio() {
+      if (!isRunning) {
+        stopAudio();
+        return;
+      }
       if (time > 6) {
-        audioCargando.currentTime = 0;
-        audioCargando.play();
-      } else {
-        audioProximo.currentTime = 0;
-        audioProximo.play();
+        if (audioProximo.currentTime > 0) audioProximo.pause();
+        if (audioCargando.paused) {
+          audioCargando.currentTime = 0;
+          audioCargando.play().catch(() => {});
+        }
+      } else if (time <= 6 && time > 0) {
+        if (audioCargando.currentTime > 0) audioCargando.pause();
+        if (audioProximo.paused) {
+          audioProximo.currentTime = 0;
+          audioProximo.play().catch(() => {});
+        }
       }
     }
 
@@ -152,17 +161,9 @@
       audioProximo.pause();
     }
 
-    function checkAudioChange() {
-      if (role !== "bomba") return;
-      if (time === 6) {
-        audioCargando.pause();
-        audioProximo.play();
-      }
-    }
-
     function checkWinLose() {
       const status = document.getElementById("status");
-      if (time >= 600) { // 10 minutos
+      if (time >= 600) {
         clearInterval(timerInterval);
         isRunning = false;
         update(ref(db, "timer"), { isRunning: false });
@@ -193,13 +194,13 @@
       updateDisplay();
     }
 
-    // Inicia el temporizador automáticamente cuando se selecciona "bomba"
-    document.querySelectorAll("button").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (btn.innerText.toLowerCase().includes("bomba")) {
-          setTimeout(() => startTimer(), 2000);
-        }
-      });
+    // --- Eventos de botones ---
+    document.getElementById("btnBomba").addEventListener("click", () => {
+      setRole("bomba");
+    });
+
+    document.getElementById("btnControl").addEventListener("click", () => {
+      setRole("control");
     });
   </script>
 </body>
