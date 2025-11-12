@@ -67,8 +67,9 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-    import { getDatabase, ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
+    import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
 
+    // Configuración Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyCcgyGXqbykaTrJvQRwgqkYSrFAUL-ob-8",
       authDomain: "bombacontrol-363e8.firebaseapp.com",
@@ -83,15 +84,15 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    // Variables globales
     let role = null;
     let timerInterval;
     let time = 300; // 5 minutos
     let isRunning = false;
-
     const audioCargando = document.getElementById("audioCargando");
     const audioProximo = document.getElementById("audioProximo");
 
-    // --- Funciones principales ---
+    // --- Configurar el rol ---
     function setRole(selectedRole) {
       role = selectedRole;
       document.getElementById("game").style.display = "block";
@@ -110,18 +111,19 @@
         }
       });
 
-      // Si es bomba, iniciar el contador al entrar
       if (role === "bomba") {
         startTimer();
       }
     }
 
+    // --- Actualizar el contador visual ---
     function updateDisplay() {
       const minutes = String(Math.floor(time / 60)).padStart(2, "0");
       const seconds = String(time % 60).padStart(2, "0");
       document.getElementById("timer").innerText = `${minutes}:${seconds}`;
     }
 
+    // --- Iniciar temporizador ---
     function startTimer() {
       if (isRunning) return;
       isRunning = true;
@@ -136,6 +138,7 @@
       }, 1000);
     }
 
+    // --- Control del audio global ---
     function handleAudio() {
       if (!isRunning) {
         stopAudio();
@@ -161,6 +164,7 @@
       audioProximo.pause();
     }
 
+    // --- Revisar condiciones de victoria o derrota ---
     function checkWinLose() {
       const status = document.getElementById("status");
       if (time >= 600) {
@@ -178,6 +182,7 @@
       }
     }
 
+    // --- Control (suma, resta y reinicio) ---
     function changeTime(amount) {
       time += amount;
       if (time < 0) time = 0;
@@ -195,13 +200,8 @@
     }
 
     // --- Eventos de botones ---
-    document.getElementById("btnBomba").addEventListener("click", () => {
-      setRole("bomba");
-    });
-
-    document.getElementById("btnControl").addEventListener("click", () => {
-      setRole("control");
-    });
+    document.getElementById("btnBomba").addEventListener("click", () => setRole("bomba"));
+    document.getElementById("btnControl").addEventListener("click", () => setRole("control"));
   </script>
 </body>
 </html>
