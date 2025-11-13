@@ -71,6 +71,18 @@
 
   let role = null;
   let ticking = null;
+  let audio = new Audio("cargando.mp3");
+  audio.loop = true;
+
+  function playAudio() {
+    audio.currentTime = 0;
+    audio.play().catch(() => console.log("Reproducción bloqueada por navegador"));
+  }
+
+  function stopAudio() {
+    audio.pause();
+    audio.currentTime = 0;
+  }
 
   function formatTime(sec) {
     if (sec < 0) sec = 0;
@@ -86,17 +98,20 @@
   onValue(timerRef, snapshot => {
     const data = snapshot.val();
     if (!data) return;
-    const { time, result } = data;
+    const { time, result, running } = data;
     document.querySelectorAll("#timer").forEach(t => t.textContent = formatTime(time));
 
     if (result === "win") {
       document.body.style.background = "#003b17";
       document.getElementById("status").innerHTML = "<span id='win'>🏆 GANASTE, bomba desactivada</span>";
+      stopAudio();
     } else if (result === "lose") {
       document.body.style.background = "#3b0000";
       document.getElementById("status").innerHTML = "<span id='lose'>💥 PERDISTE, la bomba explotó</span>";
+      stopAudio();
     } else {
       document.body.style.background = "#0b0f14";
+      if (running) playAudio();
       if (role === "bomba") document.getElementById("status").textContent = "Tiempo restante...";
       if (role === "control") document.getElementById("status").textContent = "Modo Control";
     }
@@ -114,11 +129,13 @@
       if (time <= 0) {
         await set(timerRef, { time: 0, running: false, result: "lose" });
         clearInterval(ticking);
+        stopAudio();
         return;
       }
       if (time >= 600) {
         await set(timerRef, { time: 600, running: false, result: "win" });
         clearInterval(ticking);
+        stopAudio();
         return;
       }
       await update(timerRef, { time });
@@ -136,17 +153,19 @@
     if (!data.running && !data.result) {
       await set(timerRef, { time: 300, running: true, result: "" });
       startCountdown();
-    } else if (data.running) startCountdown();
+      playAudio();
+    } else if (data.running) {
+      startCountdown();
+      playAudio();
+    }
   });
 
   // Botón Control
-  // Botón Control (CORREGIDO)
-document.getElementById("controlBtn").addEventListener("click", () => {
-  role = "control";
-  document.getElementById("selector").classList.add("hidden");
-  document.getElementById("controlView").classList.remove("hidden");
-});
-
+  document.getElementById("controlBtn").addEventListener("click", () => {
+    role = "control";
+    document.getElementById("selector").classList.add("hidden");
+    document.getElementById("controlView").classList.remove("hidden");
+  });
 
   // Restar tiempo
   document.getElementById("minusBtn").addEventListener("click", async () => {
@@ -156,6 +175,7 @@ document.getElementById("controlBtn").addEventListener("click", () => {
     let newTime = data.time - 60;
     if (newTime <= 0) {
       await set(timerRef, { time: 0, running: false, result: "lose" });
+      stopAudio();
       return;
     }
     await update(timerRef, { time: newTime });
@@ -170,6 +190,7 @@ document.getElementById("controlBtn").addEventListener("click", () => {
     if (newTime >= 600) {
       await set(timerRef, { time: 600, running: false, result: "win" });
       clearInterval(ticking);
+      stopAudio();
       return;
     }
     await update(timerRef, { time: newTime });
@@ -179,6 +200,7 @@ document.getElementById("controlBtn").addEventListener("click", () => {
   document.getElementById("resetBtn").addEventListener("click", async () => {
     await set(timerRef, { time: 300, running: true, result: "" });
     startCountdown();
+    playAudio();
   });
 
   startCountdown();
