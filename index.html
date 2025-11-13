@@ -1,294 +1,187 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Bomba Control (Global) - Final</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bomba Control Global</title>
 <style>
-  :root{--bg:#0b0f14;--muted:#9aa6b2}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;background:var(--bg);color:#fff;font-family:Inter,Segoe UI,Roboto,Arial;display:flex;align-items:center;justify-content:center;padding:20px;transition:background .6s}
-  .card{width:980px;max-width:100%;background:rgba(255,255,255,0.03);padding:24px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.6)}
-  h1{margin:0 0 14px;font-size:20px}
-  .row{display:flex;gap:12px;margin-bottom:18px}
-  button{cursor:pointer;border:0;padding:10px 14px;border-radius:8px;font-weight:700;color:#fff}
-  .bomba{background:linear-gradient(90deg,#7b0f0f,#ff5252)}
-  .control{background:linear-gradient(90deg,#0b5a85,#0bb7ff)}
-  .timer{font-size:84px;text-align:center;margin:8px 0}
-  .status{text-align:center;color:var(--muted);font-size:18px;margin-bottom:8px}
-  .controls{display:flex;gap:8px;justify-content:center}
-  .muted{color:var(--muted)}
-  .small{font-size:13px;color:var(--muted);text-align:center;margin-top:6px}
-  @media(max-width:720px){.row{flex-direction:column}}
+  body {
+    margin: 0; font-family: Arial, sans-serif; 
+    background-color: #0b0f14; color: #fff;
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; flex-direction: column;
+    transition: background 0.8s;
+  }
+  .hidden { display: none; }
+  button {
+    margin: 8px; padding: 12px 18px; border: none; border-radius: 8px;
+    font-weight: bold; cursor: pointer; color: #fff;
+  }
+  #bombaBtn { background: linear-gradient(90deg,#7b0f0f,#ff5252); }
+  #controlBtn { background: linear-gradient(90deg,#0b5a85,#0bb7ff); }
+  #timer { font-size: 100px; margin: 20px 0; }
+  #status { font-size: 28px; color: #9aa6b2; margin-top: 10px; text-align: center; }
+  #controlPanel button { background: rgba(255,255,255,0.15); }
+  #win { color: #00ff90; font-size: 38px; }
+  #lose { color: #ff4040; font-size: 38px; }
 </style>
 </head>
 <body>
-  <div class="card" role="application" aria-live="polite">
-    <h1>Selecciona tu rol</h1>
 
-    <div id="selector" class="row">
-      <button id="bombaBtn" class="bomba">Bomba</button>
-      <button id="controlBtn" class="control">Control</button>
-    </div>
+<div id="selector">
+  <h1>Selecciona tu rol</h1>
+  <button id="bombaBtn">Bomba</button>
+  <button id="controlBtn">Control</button>
+</div>
 
-    <div id="bombaView" class="hidden" style="display:none">
-      <div id="timerB" class="timer">05:00</div>
-      <div id="statusB" class="status">Esperando...</div>
-    </div>
+<div id="bombaView" class="hidden">
+  <div id="timer">05:00</div>
+  <div id="status">Esperando...</div>
+</div>
 
-    <div id="controlView" class="hidden" style="display:none">
-      <div id="timerC" class="timer">05:00</div>
-      <div id="statusC" class="status">Modo Control</div>
-      <div class="controls" id="controlPanel">
-        <button id="minusBtn">− 1:00</button>
-        <button id="plusBtn">+ 1:30</button>
-        <button id="resetBtn">Reiniciar a 05:00</button>
-      </div>
-      <div class="small">El Control puede sumar, restar y reiniciar. Los cambios se verán en todos los dispositivos.</div>
-    </div>
+<div id="controlView" class="hidden">
+  <div id="timer">05:00</div>
+  <div id="status">Modo Control</div>
+  <div id="controlPanel">
+    <button id="minusBtn">-1:00</button>
+    <button id="plusBtn">+1:30</button>
+    <button id="resetBtn">Reiniciar</button>
   </div>
+</div>
 
-  <!-- Audios (URLs públicas) -->
-  <audio id="soundWin" preload="auto" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
-  <audio id="soundLose" preload="auto" src="https://actions.google.com/sounds/v1/alarms/explosion.ogg"></audio>
-
+<!-- Firebase -->
 <script type="module">
-/* ---------- Firebase init (tu config) ---------- */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, onValue, get, set, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCcgyGXqbykaTrJvQRwgqkYSrFAUL-ob-8",
-  authDomain: "bombacontrol-363e8.firebaseapp.com",
-  databaseURL: "https://bombacontrol-363e8-default-rtdb.firebaseio.com",
-  projectId: "bombacontrol-363e8",
-  storageBucket: "bombacontrol-363e8.firebasestorage.app",
-  messagingSenderId: "387694346907",
-  appId: "1:387694346907:web:4a8b90e3bf25c1cd277c3e",
-  measurementId: "G-CXLEEKDE3J"
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSyCcgyGXqbykaTrJvQRwgqkYSrFAUL-ob-8",
+    authDomain: "bombacontrol-363e8.firebaseapp.com",
+    databaseURL: "https://bombacontrol-363e8-default-rtdb.firebaseio.com",
+    projectId: "bombacontrol-363e8",
+    storageBucket: "bombacontrol-363e8.firebasestorage.app",
+    messagingSenderId: "387694346907",
+    appId: "1:387694346907:web:4a8b90e3bf25c1cd277c3e",
+    measurementId: "G-CXLEEKDE3J"
+  };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const timerRef = ref(db, 'timer'); // nodo: /timer
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const timerRef = ref(db, 'timer');
 
-/* ---------- Elementos UI ---------- */
-const selector = document.getElementById('selector');
-const bombaView = document.getElementById('bombaView');
-const controlView = document.getElementById('controlView');
-const timerB = document.getElementById('timerB');
-const timerC = document.getElementById('timerC');
-const statusB = document.getElementById('statusB');
-const statusC = document.getElementById('statusC');
-const minusBtn = document.getElementById('minusBtn');
-const plusBtn = document.getElementById('plusBtn');
-const resetBtn = document.getElementById('resetBtn');
-const soundWin = document.getElementById('soundWin');
-const soundLose = document.getElementById('soundLose');
+  let role = null;
+  let ticking = null;
 
-/* ---------- Estado local ---------- */
-let role = null;
-let ticking = null;
-
-/* ---------- Helpers ---------- */
-function fmt(sec){
-  if (sec < 0) sec = 0;
-  const m = Math.floor(sec / 60), s = sec % 60;
-  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-}
-
-/* Inicializar DB solo si no existe (para no sobreescribir en cada carga) */
-(async function ensureInitial(){
-  const snap = await get(timerRef);
-  if (!snap.exists()){
-    // time en segundos (5:00), running boolean, result ""| "win" | "lose"
-    await set(timerRef, { time: 300, running: false, result: "" });
+  function formatTime(sec) {
+    if (sec < 0) sec = 0;
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   }
-})();
 
-/* ---------- Escuchar cambios globales ---------- */
-onValue(timerRef, (snap) => {
-  const data = snap.val();
-  if (!data) return;
-  const { time=300, running=false, result="" } = data;
+  // Inicializa Firebase si está vacío
+  set(timerRef, { time: 300, running: false, result: "" });
 
-  // actualizar todas las vistas
-  timerB.textContent = fmt(time);
-  timerC.textContent = fmt(time);
+  // Escuchar cambios globales
+  onValue(timerRef, snapshot => {
+    const data = snapshot.val();
+    if (!data) return;
+    const { time, result } = data;
+    document.querySelectorAll("#timer").forEach(t => t.textContent = formatTime(time));
 
-  if (result === "win"){
-    document.body.style.background = "#003b17";
-    statusB.innerHTML = "🏆 <strong>GANASTE, bomba desactivada</strong>";
-    statusC.innerHTML = "🏆 <strong>GANASTE, bomba desactivada</strong>";
-    // reproducir sonido una sola vez (si está pausado el audio por política, se intentará)
-    try{ soundWin.currentTime = 0; soundWin.play().catch(()=>{}); }catch(e){}
-    // detener cualquier ticker local
-    if (ticking){ clearInterval(ticking); ticking = null; }
-  } else if (result === "lose"){
-    document.body.style.background = "#3b0000";
-    statusB.innerHTML = "💥 <strong>PERDISTE, la bomba explotó</strong>";
-    statusC.innerHTML = "💥 <strong>PERDISTE, la bomba explotó</strong>";
-    try{ soundLose.currentTime = 0; soundLose.play().catch(()=>{}); }catch(e){}
-    if (ticking){ clearInterval(ticking); ticking = null; }
-  } else {
-    // modo normal
-    document.body.style.background = "var(--bg)";
-    if (role === "bomba"){ statusB.textContent = "Tiempo restante..."; }
-    if (role === "control"){ statusC.textContent = "Modo Control"; }
-  }
-});
-
-/* ---------- Lógica de cuenta (solo un cliente decreta): 
-   Estrategia simple y segura para evitar múltiples decrementos:
-   - El temporizador se reduce en el servidor solamente por *un cliente* que tenga el flag `running` activo.
-   - Para que un cliente empiece a decrementar, verifica `running` y si es true, **intenta** tomar el rol de ticker
-     escribiendo su clientId en /timer/ownerId usando update con verificación posterior.
-   Nota: Esta solución evita la situación típica donde todos los clientes decrementen al mismo tiempo.
-*/
-
-function generateClientId(){
-  return 'c_' + Math.random().toString(36).slice(2,9);
-}
-const clientId = generateClientId();
-
-async function tryStartTickerIfNeeded(){
-  const snap = await get(timerRef);
-  const data = snap.val();
-  if (!data) return;
-  if (data.result) return; // terminado
-  if (!data.running) return; // no está activo
-  // si ya hay owner y no soy yo, no hago nada
-  if (data.ownerId && data.ownerId !== clientId) return;
-  // intentar ser owner (si ownerId distinto o vacío)
-  await update(timerRef, { ownerId: clientId });
-  // comprobar de nuevo que soy owner
-  const snap2 = await get(timerRef);
-  const data2 = snap2.val();
-  if (!data2) return;
-  if (data2.ownerId !== clientId) return; // otro tomó el rol
-  // ahora soy el ticker: corro el decremento cada 1s hasta que running=false o result != ""
-  if (ticking) clearInterval(ticking);
-  ticking = setInterval(async () => {
-    const s = await get(timerRef);
-    const cur = s.val();
-    if (!cur) return;
-    if (cur.result) { clearInterval(ticking); ticking = null; return; }
-    if (!cur.running) { clearInterval(ticking); ticking = null; return; }
-    // Decrementar 1 segundo
-    let newTime = (cur.time ?? 0) - 1;
-    if (newTime <= 0){
-      // perder
-      await set(timerRef, { time: 0, running: false, result: "lose", ownerId: null });
-      clearInterval(ticking); ticking = null;
-      return;
+    if (result === "win") {
+      document.body.style.background = "#003b17";
+      document.getElementById("status").innerHTML = "<span id='win'>🏆 GANASTE, bomba desactivada</span>";
+    } else if (result === "lose") {
+      document.body.style.background = "#3b0000";
+      document.getElementById("status").innerHTML = "<span id='lose'>💥 PERDISTE, la bomba explotó</span>";
+    } else {
+      document.body.style.background = "#0b0f14";
+      if (role === "bomba") document.getElementById("status").textContent = "Tiempo restante...";
+      if (role === "control") document.getElementById("status").textContent = "Modo Control";
     }
-    if (newTime >= 600){
-      // ganar si por alguna razon excede (aunque aquí decrementando no ocurrirá)
-      await set(timerRef, { time: 600, running: false, result: "win", ownerId: null });
-      clearInterval(ticking); ticking = null;
-      return;
-    }
-    // actualizar solo time (mantener other fields)
-    await update(timerRef, { time: newTime });
-  }, 1000);
-}
+  });
 
-/* Cada vez que el nodo timer cambia, intentamos tomar el rol de ticker si corresponde */
-onValue(timerRef, (snap) => {
-  const d = snap.val();
-  if (!d) return;
-  // si running && (no ownerId o ownerId == clientId) -> intento iniciar ticker
-  if (d.running && (!d.ownerId || d.ownerId === clientId)){
-    tryStartTickerIfNeeded().catch(()=>{});
-  } else {
-    // Si no soy owner y alguien más lo es, aseguro no tener ticker local
-    if (ticking){ clearInterval(ticking); ticking = null; }
+  // Función de cuenta regresiva
+  async function startCountdown() {
+    if (ticking) clearInterval(ticking);
+    ticking = setInterval(async () => {
+      const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
+      const data = await resp.json();
+      if (!data || data.result) return;
+
+      let time = data.time - 1;
+      if (time <= 0) {
+        await set(timerRef, { time: 0, running: false, result: "lose" });
+        clearInterval(ticking);
+        return;
+      }
+      if (time >= 600) {
+        await set(timerRef, { time: 600, running: false, result: "win" });
+        clearInterval(ticking);
+        return;
+      }
+      await update(timerRef, { time });
+    }, 1000);
   }
-});
 
-/* ---------- UI acciones ---------- */
+  // Botón Bomba
+  document.getElementById("bombaBtn").addEventListener("click", async () => {
+    role = "bomba";
+    document.getElementById("selector").classList.add("hidden");
+    document.getElementById("bombaView").classList.remove("hidden");
 
-// Bomba: inicia temporizador si no está en marcha (y toma ownership)
-document.getElementById('bombaBtn').addEventListener('click', async () => {
-  role = "bomba";
-  selector.style.display = "none";
-  bombaView.style.display = "";
-  controlView.style.display = "none";
+    const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
+    const data = await resp.json();
+    if (!data.running && !data.result) {
+      await set(timerRef, { time: 300, running: true, result: "" });
+      startCountdown();
+    } else if (data.running) startCountdown();
+  });
 
-  const snap = await get(timerRef);
-  const data = snap.val() || {};
-  if (data.result){
-    // si ya terminó, sólo mostramos estado (no reiniciamos)
-    return;
-  }
-  if (!data.running){
-    // iniciamos globalmente: time 300, running true, ownerId = mi clientId
-    await set(timerRef, { time: 300, running: true, result: "", ownerId: clientId });
-    // el onValue anterior iniciará el ticker si corresponde
-  } else {
-    // si ya está corriendo, intentamos tomar owner para decrementar si no hay otro owner
-    await update(timerRef, { ownerId: data.ownerId ? data.ownerId : clientId });
-  }
-});
-
-// Control: permite modificar tiempo y reiniciar
-document.getElementById('controlBtn').addEventListener('click', () => {
+  // Botón Control
+  // Botón Control (CORREGIDO)
+document.getElementById("controlBtn").addEventListener("click", () => {
   role = "control";
-  selector.style.display = "none";
-  controlView.style.display = "";
-  bombaView.style.display = "none";
+  document.getElementById("selector").classList.add("hidden");
+  document.getElementById("controlView").classList.remove("hidden");
 });
 
-// Restar 1:00
-minusBtn.addEventListener('click', async () => {
-  const snap = await get(timerRef);
-  const data = snap.val();
-  if (!data) return;
-  if (data.result) return; // terminado
-  let newTime = (data.time ?? 0) - 60;
-  if (newTime <= 0){
-    // perder inmediatamente
-    await set(timerRef, { time: 0, running: false, result: "lose", ownerId: null });
-    return;
-  }
-  // update time (no cambiar ownerId)
-  await update(timerRef, { time: newTime });
-});
 
-// Sumar 1:30
-plusBtn.addEventListener('click', async () => {
-  const snap = await get(timerRef);
-  const data = snap.val();
-  if (!data) return;
-  if (data.result) return;
-  let newTime = (data.time ?? 0) + 90;
-  if (newTime >= 600){
-    // ganar inmediatamente
-    await set(timerRef, { time: 600, running: false, result: "win", ownerId: null });
-    return;
-  }
-  await update(timerRef, { time: newTime });
-});
-
-// Reiniciar a 05:00 y arrancar (Control lo hace posible)
-resetBtn.addEventListener('click', async () => {
-  // Reiniciar: time 300, running true, quitar resultado, quitar owner para que quien esté disponible tome el ticker
-  await set(timerRef, { time: 300, running: true, result: "", ownerId: null });
-  // onValue/tryStartTickerIfNeeded se encargan de que alguien empiece a decrementar
-});
-
-/* Al cerrar la pestaña, si soy owner limpio ownerId para permitir que otro tome el ticker */
-window.addEventListener('beforeunload', async (e) => {
-  try{
-    const snap = await get(timerRef);
-    const data = snap.val();
-    if (data && data.ownerId === clientId){
-      // dejar ownerId null para que otro cliente pueda tomarlo
-      await update(timerRef, { ownerId: null });
+  // Restar tiempo
+  document.getElementById("minusBtn").addEventListener("click", async () => {
+    const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
+    const data = await resp.json();
+    if (data.result) return;
+    let newTime = data.time - 60;
+    if (newTime <= 0) {
+      await set(timerRef, { time: 0, running: false, result: "lose" });
+      return;
     }
-  }catch(err){ /* ignore */ }
-});
+    await update(timerRef, { time: newTime });
+  });
 
+  // Sumar tiempo
+  document.getElementById("plusBtn").addEventListener("click", async () => {
+    const resp = await fetch(`${firebaseConfig.databaseURL}/timer.json`);
+    const data = await resp.json();
+    if (data.result) return;
+    let newTime = data.time + 90;
+    if (newTime >= 600) {
+      await set(timerRef, { time: 600, running: false, result: "win" });
+      clearInterval(ticking);
+      return;
+    }
+    await update(timerRef, { time: newTime });
+  });
+
+  // Reiniciar
+  document.getElementById("resetBtn").addEventListener("click", async () => {
+    await set(timerRef, { time: 300, running: true, result: "" });
+    startCountdown();
+  });
+
+  startCountdown();
 </script>
 </body>
 </html>
